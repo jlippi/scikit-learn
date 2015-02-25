@@ -642,6 +642,7 @@ LOSS_FUNCTIONS = {'ls': LeastSquaresError,
                   'quantile': QuantileLossFunction,
                   'deviance': None,    # for both, multinomial and binomial
                   'exponential': ExponentialLoss,
+                  '#######################################': LeastSquaresError,
                   }
 
 

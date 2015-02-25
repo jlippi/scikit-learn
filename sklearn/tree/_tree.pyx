@@ -921,8 +921,12 @@ cdef inline void _init_split(SplitRecord* self, SIZE_t start_pos) nogil:
 
 cdef class Splitter:
     def __cinit__(self, Criterion criterion, SIZE_t max_features,
-                  SIZE_t min_samples_leaf, double min_weight_leaf,
-                  object random_state):
+                  SIZE_t min_samples_leaf, object min_weight_leaf,
+                  object random_state=None):
+        if random_state is None:
+          random_state = min_weight_leaf
+          min_weight_leaf = 0
+
         self.criterion = criterion
 
         self.samples = NULL
@@ -1034,8 +1038,8 @@ cdef class BaseDenseSplitter(Splitter):
     cdef SIZE_t X_fx_stride
 
     def __cinit__(self, Criterion criterion, SIZE_t max_features,
-                  SIZE_t min_samples_leaf, double min_weight_leaf,
-                  object random_state):
+                  SIZE_t min_samples_leaf, object min_weight_leaf,
+                  object random_state=0):
         # Parent __cinit__ is automatically called
 
         self.X = NULL
@@ -3048,7 +3052,7 @@ cdef class Tree:
             return self._get_value_ndarray()[:self.node_count]
 
     def __cinit__(self, int n_features, np.ndarray[SIZE_t, ndim=1] n_classes,
-                  int n_outputs):
+                  int n_outputs, *args):
         """Constructor."""
         # Input/Output layout
         self.n_features = n_features
@@ -3096,12 +3100,25 @@ cdef class Tree:
         self.node_count = d["node_count"]
 
         if 'nodes' not in d:
-            raise ValueError('You have loaded Tree version which '
-                             'cannot be imported')
+        #    raise ValueError('You have loaded Tree version which '
+        #                     'cannot be imported')
+          d['left_child'] = d['children_left']
+          d['right_child'] = d['children_right']
+          d['weighted_n_node_samples'] = d['n_node_samples'] * 1.0
+          names = ['left_child','right_child','feature','threshold','impurity','n_node_samples','weighted_n_node_samples']
+          formats = [np.intp, np.intp, np.intp, np.float64, np.float64, np.intp, np.float64]
+          dt = np.dtype({'names': names, 'formats': formats})
+          a = np.ndarray((d['node_count']),dt)
+          for name in names:
+            a[name] = d[name]
+          d = {'nodes':a,
+               'node_count':d['node_count'],
+               'values':np.ndarray((d['node_count'],self.n_outputs,self.max_n_classes),buffer=d['value'])}
 
         node_ndarray = d['nodes']
         value_ndarray = d['values']
 
+       
         value_shape = (node_ndarray.shape[0], self.n_outputs,
                        self.max_n_classes)
         if (node_ndarray.ndim != 1 or
